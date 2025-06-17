@@ -10,6 +10,9 @@ def test_homepage_nav_and_start_listening():
         homepage.goto()
 
         assert homepage.is_nav_visible()
+
+        assert homepage.click_discover_button()
+
         homepage.click_start_listening()
 
         # Validate the new URL or action after clicking "Start Listening"
