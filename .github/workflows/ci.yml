@@ -1,3 +1,10 @@
+name: Run Playwright Tests
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -19,6 +26,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Install Playwright browsers
+        run: playwright install
+
       - name: Run tests
         run: pytest
-
