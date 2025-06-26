@@ -14,7 +14,7 @@ def test_for_you_nav_redirect():
 
     with sync_playwright() as p:
         # Launch browser in headed mode for debugging (set headless=True for CI)
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
         # Start login flow

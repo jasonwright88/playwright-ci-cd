@@ -16,7 +16,7 @@ def test_full_login_flow():
     assert password, "Missing env var: SIRIUSXM_PASSWORD"
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)  # Set to False to watch the test
+        browser = p.chromium.launch(headless=True)  # Set to False to watch the test
         page = browser.new_page()
         login_page = LoginPage(page)
 
