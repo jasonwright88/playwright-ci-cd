@@ -1,34 +1,31 @@
-name: CI for Playwright Tests
+name: Run Playwright Tests
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
+    branches: [ main ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          python-version: '3.13'
 
       - name: Install dependencies
         run: |
-          python -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip
-          pip install playwright pytest
-          playwright install
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run tests
+      - name: Install Playwright Browsers
         run: |
-          source venv/bin/activate
-          pytest tests
+          python -m playwright install --with-deps
+
+      - name: Run Tests
+        run: |
+          pytest
 
