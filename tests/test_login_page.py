@@ -3,6 +3,10 @@ from pages.login_page import LoginPage
 from dotenv import load_dotenv
 import os
 
+if os.getenv("CI") != "true":
+    from dotenv import load_dotenv
+    load_dotenv()
+
 def test_full_login_flow():
     """Test the end-to-end login flow for SiriusXM using Playwright."""
     

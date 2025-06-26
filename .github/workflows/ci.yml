@@ -1,18 +1,16 @@
-name: Run Playwright Tests
-
-on:
-  push:
-    branches: [ main ]
-
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      SIRIUSXM_USERNAME: ${{ secrets.SIRIUSXM_USERNAME }}
+      SIRIUSXM_PASSWORD: ${{ secrets.SIRIUSXM_PASSWORD }}
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.13'
 
@@ -21,11 +19,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Install Playwright Browsers
-        run: |
-          python -m playwright install --with-deps
-
-      - name: Run Tests
-        run: |
-          pytest
+      - name: Run tests
+        run: pytest
 

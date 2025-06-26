@@ -6,6 +6,10 @@ from playwright.sync_api import sync_playwright
 from pages.login_page import LoginPage
 from pages.for_you_page import ForYouPage
 
+if os.getenv("CI") != "true":
+    from dotenv import load_dotenv
+    load_dotenv()
+
 def test_for_you_nav_redirect():
     # Load environment variables for username/password
     load_dotenv()

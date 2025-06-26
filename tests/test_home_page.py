@@ -1,6 +1,10 @@
 from playwright.sync_api import sync_playwright  # Sync API for Playwright
 from pages.home_page import HomePage            # Import the HomePage object
 
+if os.getenv("CI") != "true":
+    from dotenv import load_dotenv
+    load_dotenv()
+
 # Test function using pytest naming convention (must start with 'test_')
 def test_homepage_nav_and_start_listening():
     with sync_playwright() as p:
