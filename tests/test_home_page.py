@@ -1,3 +1,4 @@
+import os
 from playwright.sync_api import sync_playwright  # Sync API for Playwright
 from pages.home_page import HomePage            # Import the HomePage object
 
