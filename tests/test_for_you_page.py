@@ -27,7 +27,7 @@ def test_for_you_nav_redirect():
     assert username and password, "Missing credentials in environment variables"
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)  # Set to False for local debugging
+        browser = p.chromium.launch(headless=True)  # Set to False for local debugging
         page = browser.new_page()
 
         try:
