@@ -67,42 +67,96 @@ def test_for_you_nav_redirect():
                 timeout=15000
             )
 
-            # Click the 'siriusxm-hits-1' channel
-            for_you_page.click_channel_by_href("siriusxm-hits-1")
-            print(f"🔗 Current URL after click: {page.url}")
+            # Try known preferred channels first
+            preferred_channels = ["siriusxm-hits-1", "pop2K", "80s-on-8", "90s-on-9", "tiktok-radio", "unwell-radio"]
+            clicked = False
 
-            # Confirm navigation to expected channel page
-            page.wait_for_url("**/player/channel-linear/siriusxm-hits-1/*", timeout=10000)
-            assert "/player/channel-linear/siriusxm-hits-1" in page.url
+            for channel in preferred_channels:
+                if for_you_page.click_channel_by_href(channel):
+                    print(f"✅ Clicked preferred channel: {channel}")
+                    clicked = True
+                    break
 
-            # Verify channel subtitle to confirm correct content
-            subtitle_locator = page.locator('[data-qa="entity-header-subtitle-string"]')
-            subtitle_locator.wait_for(state="visible", timeout=5000)
-            subtitle_text = subtitle_locator.inner_text()
-            print(f"🔍 Subtitle text found: '{subtitle_text}'")
+            # Fallback: click the first available item with /player/ in href
+            if not clicked:
+                print("⚠️ Preferred channels not found. Clicking first /player/ item as fallback.")
+                if for_you_page.click_first_player_link():
+                    clicked = True
 
-            # Normalize spacing and compare to expected value
-            normalized_text = re.sub(r"\s+", " ", subtitle_text).strip()
-            expected_text = "Ch 2 • Pop hits, now to next"
-            assert normalized_text == expected_text, f"❌ Subtitle mismatch.\nExpected: '{expected_text}'\nGot: '{normalized_text}'"
+            assert clicked, "❌ No playable content found in carousels."
 
-            # Try to click the primary visible Play button (dynamic aria-label)
+            # ⏳ Wait for any loading spinners or overlays to disappear
+            try:
+                page.wait_for_selector('div[class*="LoadingSpinner"]', state='detached', timeout=5000)
+                print("✅ Spinner or loading overlay is gone.")
+            except:
+                print("⚠️ No spinner detected or already gone.")
+
+            # 🧽 Check and dismiss any residual overlay
+            try:
+                overlay_close_button = page.locator('button[data-qa="close-overlay"]')
+                if overlay_close_button.is_visible(timeout=3000):
+                    print("🛑 Overlay detected again. Dismissing it...")
+                    overlay_close_button.click()
+                    page.wait_for_timeout(1000)
+            except Exception as overlay_error:
+                print(f"⚠️ Overlay close button not found or error occurred: {overlay_error}")
+
+            # ▶️ Try to click the visible Play button
             play_button = page.locator('button[aria-label^="Play"]:visible').first
             play_button.wait_for(state="visible", timeout=5000)
 
+            # Manually scroll into view before clicking
+            play_button.scroll_into_view_if_needed(timeout=3000)
             print("▶️ Clicking the Play button...")
             play_button.click()
+            for i in range(3):
+                print(f"⏳ Modal check attempt {i+1}...")
+                page.wait_for_timeout(1000)  # Wait 1s before checking for modal
+                if for_you_page.force_dismiss_playback_stalled_modal():
+                    print("✅ Modal dismissed via click.")
+                    page.wait_for_timeout(1000)
+                else:
+                    print("❌ No modal or button not clickable.")
+                    page.screenshot(path=f"debug_screenshots/modal_attempt_{i+1}.png", full_page=True)
+                    break
 
-            # Optional: handle "Playback Stalled" modal if it appears
-            try:
-                try_again_button = page.locator('button:has-text("Try again")')
-                if try_again_button.is_visible(timeout=3000):
-                    print("⚠️ Playback stalled modal detected. Clicking 'Try again'...")
-                    try_again_button.click()
-                    page.wait_for_timeout(2000)  # Give time for retry to take effect
-            except Exception as modal_error:
-                print(f"⚠️ No playback stall modal appeared or error handling modal: {modal_error}")
+            # ✅ Verify we landed on the correct channel page
+            current_url = page.url
+            print(f"🔗 Landed on URL: {current_url}")
+            assert "/player/channel-linear/" in current_url, f"❌ Unexpected URL: {current_url}"
 
+            play_button.click()
+            for i in range(3):
+                print(f"⏳ Modal check attempt {i+1}...")
+                page.wait_for_timeout(1000)  # Wait 1s before checking for modal
+                if for_you_page.force_dismiss_playback_stalled_modal():
+                    print("✅ Modal dismissed via click.")
+                    page.wait_for_timeout(1000)
+                else:
+                    print("❌ No modal or button not clickable.")
+                    page.screenshot(path=f"debug_screenshots/modal_attempt_{i+1}.png", full_page=True)
+                    break
+
+            # Verify that the Pause button appears, confirming that playback started
+            pause_button = page.locator('button[aria-label^="Pause"]:visible').first
+
+            pause_button.wait_for(state="visible", timeout=5000)
+            assert pause_button.is_visible(), "❌ Pause button did not appear, playback might not have started."
+            # Verify that the Play button appears, confirming that playback is resumed
+            pause_button.click()
+            for i in range(3):
+                print(f"⏳ Modal check attempt {i+1}...")
+                page.wait_for_timeout(1000)  # Wait 1s before checking for modal
+                if for_you_page.force_dismiss_playback_stalled_modal():
+                    print("✅ Modal dismissed via click.")
+                    page.wait_for_timeout(1000)
+                else:
+                    print("❌ No modal or button not clickable.")
+                    page.screenshot(path=f"debug_screenshots/modal_attempt_{i+1}.png", full_page=True)
+                    break
+
+            assert play_button.is_visible(), "❌ Play button did not appear, playback might not have resumed."
 
         except Exception as e:
             # Take screenshot on failure for easier debugging

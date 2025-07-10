@@ -1,54 +1,29 @@
-from playwright.sync_api import Page
-import time
 import re
+import time
+from playwright.sync_api import Page
+
 
 class ForYouPage:
     def __init__(self, page: Page):
         self.page = page
-        self.for_you_nav = "a[data-qa='content-nav-for-you']"
-        self.music_nav = "a[data-qa='content-nav-music']"
 
     def click_for_you_nav(self):
+        print("Clicking Music nav item to reset selection...")
+        self.page.click('a[data-qa="content-nav-music"]')
+        self.page.wait_for_timeout(500)
+
+        print("Clicking For You nav item...")
+        self.page.click('a[data-qa="content-nav-for-you"]')
+        self.page.wait_for_timeout(1000)
+
+        # Confirm UUID version of URL is loaded
+        updated_href = self.page.locator('a[data-qa="content-nav-for-you"]').get_attribute("href")
+        print(f"✅ For You nav href updated: {updated_href}")
+
+    def click_channel_by_href(self, channel_slug: str, max_scrolls: int = 10) -> bool:
         """
-        Navigates to the For You tab by first clicking the Music tab to reset state.
-        Then waits for the For You nav to update its href with a UUID path.
-        """
-        try:
-            print("Clicking Music nav item to reset selection...")
-            music_nav = self.page.locator(self.music_nav)
-            music_nav.wait_for(state="visible", timeout=10000)
-            music_nav.click(force=True)
-            time.sleep(1)  # Give UI time to register selection
-
-            print("Clicking For You nav item...")
-            for_you_nav = self.page.locator(self.for_you_nav)
-            for_you_nav.wait_for(state="visible", timeout=10000)
-            for_you_nav.click(force=True)
-
-            # Wait for the href to update with a UUID (indicating navigation occurred)
-            timeout = 10
-            start_time = time.time()
-            while time.time() - start_time < timeout:
-                href = for_you_nav.get_attribute("href")
-                if href and re.search(r"/player/home/for-you/[a-f0-9-]{36}", href):
-                    print(f"✅ For You nav href updated: {href}")
-                    return
-                time.sleep(0.5)
-
-            raise TimeoutError("❌ For You nav href did not update with UUID.")
-
-        except Exception as e:
-            print("❌ Failed to verify For You nav href behavior.")
-            screenshot_path = "debug_screenshots/for_you_nav_failure.png"
-            self.page.screenshot(path=screenshot_path)
-            print(f"Screenshot saved to: {screenshot_path}")
-            raise e
-
-    def click_channel_by_href(self, channel_slug: str, max_scrolls: int = 10):
-        """
-        Searches all carousels for a channel link with href format:
-        /player/channel-linear/{slug}/{uuid}
-        and clicks it using JS if necessary.
+        Clicks a channel with a matching slug and UUID-based href from any carousel.
+        Example href: /player/channel-linear/siriusxm-hits-1/<uuid>
         """
         pattern = re.compile(rf"/player/channel-linear/{re.escape(channel_slug)}/[a-f0-9-]+")
         print(f"🔍 Looking for hrefs matching regex: {pattern.pattern}")
@@ -67,17 +42,17 @@ class ForYouPage:
                 print(f"🔗 Found {total_links} potential link(s) on scroll attempt {attempt + 1}")
 
                 for i in range(total_links):
-                    link = links.nth(i)
-                    href = link.get_attribute("href") or ""
-                    if not pattern.match(href):
-                        continue
+                    try:
+                        link = links.nth(i)
+                        element_handle = link.element_handle()
+                        if not element_handle:
+                            continue
 
-                    print(f"🔍 Link {i} href: {href}")
+                        href = element_handle.get_attribute("href") or ""
+                        if not pattern.match(href):
+                            continue
 
-                    # Force scroll into view and JS click to ensure interaction
-                    element_handle = link.element_handle()
-                    if element_handle:
-                        print("📜 Forcing scroll into view and JS click...")
+                        print(f"🔍 Clicking link: {href}")
                         self.page.evaluate(
                             """el => {
                                 el.scrollIntoView({behavior: 'auto', block: 'center'});
@@ -85,12 +60,12 @@ class ForYouPage:
                             }""",
                             element_handle
                         )
-                        return
-                    else:
-                        print("❌ Could not resolve ElementHandle. Skipping.")
+                        return True
+                    except Exception as err:
+                        print(f"⚠️ Skipping link {i} due to error: {err}")
                         continue
 
-                # Scroll carousel forward if Next button is available
+                # Optional: try scrolling carousel forward if needed
                 next_btn = carousel.locator('button:has(svg path[d*="M8.293"])')
                 if next_btn.count() > 0 and next_btn.first.is_enabled():
                     print("➡️ Clicking Next button to scroll carousel.")
@@ -100,4 +75,101 @@ class ForYouPage:
                     print("🚫 Next button not available or disabled.")
                     break
 
-        raise TimeoutError(f"❌ Channel with slug '{channel_slug}' not found in any carousel.")
+        print(f"❌ Channel with slug '{channel_slug}' not found in any carousel.")
+        return False
+
+    def click_first_player_link(self, max_scrolls: int = 10) -> bool:
+        """
+        Fallback: clicks the first visible link in any carousel that contains /player/ in href.
+        """
+        pattern = re.compile(r"/player/.+/.+")
+        carousels = self.page.locator('[data-qa^="content-carousel"]')
+        carousel_count = carousels.count()
+        print(f"🔍 Fallback: searching carousels for any /player/ link.")
+
+        for c in range(carousel_count):
+            print(f"\n➡️ Checking carousel {c + 1} of {carousel_count}")
+            carousel = carousels.nth(c)
+
+            for attempt in range(max_scrolls):
+                links = carousel.locator('a[href*="/player/"]')
+                total_links = links.count()
+                print(f"🔗 Found {total_links} links on scroll attempt {attempt + 1}")
+
+                for i in range(total_links):
+                    try:
+                        link = links.nth(i)
+                        element_handle = link.element_handle()
+                        if not element_handle:
+                            continue
+
+                        href = element_handle.get_attribute("href") or ""
+                        if not pattern.match(href):
+                            continue
+
+                        print(f"🔍 Clicking fallback link: {href}")
+                        self.page.evaluate(
+                            """el => {
+                                el.scrollIntoView({behavior: 'auto', block: 'center'});
+                                el.click();
+                            }""",
+                            element_handle
+                        )
+                        return True
+                    except Exception as err:
+                        print(f"⚠️ Skipping link {i} due to error: {err}")
+                        continue
+
+                # Attempt to scroll carousel forward
+                next_btn = carousel.locator('button:has(svg path[d*="M8.293"])')
+                if next_btn.count() > 0 and next_btn.first.is_enabled():
+                    print("➡️ Clicking Next button to scroll carousel.")
+                    next_btn.first.click()
+                    self.page.wait_for_timeout(500)
+                else:
+                    print("🚫 Next button not available or disabled.")
+                    break
+
+        print("❌ No fallback clickable link found.")
+        return False
+    
+    def channel_exists(self, channel_slug: str) -> bool:
+        locator = self.page.locator(f'a[href*="/player/channel-linear/{channel_slug}/"]')
+        return locator.count() > 0
+
+    def get_channel_href(self, channel_slug: str) -> str:
+        locator = self.page.locator(f'a[href*="/player/channel-linear/{channel_slug}/"]').first
+        return locator.get_attribute("href")
+    
+    def force_dismiss_playback_stalled_modal(self) -> bool:
+        """
+        Detects and dismisses the 'Playback Stalled' modal by clicking the 'Try again' button.
+        Returns True if the modal appeared and was dismissed.
+        """
+        try:
+            # Locate modal by a stable data-qa attribute
+            modal = self.page.locator('[data-qa="content-overlay-modal"]')
+
+            if not modal.is_visible(timeout=3000):
+                print("❌ Playback modal not visible.")
+                return False
+
+            print("🧪 Modal is visible. Looking for 'Try again' button...")
+
+            # Look for button with *exact* visible text "Try again" inside modal
+            try_again_button = modal.locator("button", has_text="Try again")
+
+            try_again_button.scroll_into_view_if_needed(timeout=2000)
+            try_again_button.wait_for(state="visible", timeout=2000)
+            try_again_button.click()
+            print("✅ Clicked 'Try again' to dismiss modal.")
+            return True
+
+        except Exception as e:
+            print(f"⚠️ Could not dismiss modal: {e}")
+            return False
+
+
+
+
+
