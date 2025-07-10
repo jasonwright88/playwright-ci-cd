@@ -142,32 +142,21 @@ class ForYouPage:
         return locator.get_attribute("href")
     
     def force_dismiss_playback_stalled_modal(self) -> bool:
-        """
-        Detects and dismisses the 'Playback Stalled' modal by clicking the 'Try again' button.
-        Returns True if the modal appeared and was dismissed.
-        """
         try:
-            # Locate modal by a stable data-qa attribute
             modal = self.page.locator('[data-qa="content-overlay-modal"]')
-
-            if not modal.is_visible(timeout=3000):
-                print("❌ Playback modal not visible.")
-                return False
-
+            modal.wait_for(state="visible", timeout=3000)
             print("🧪 Modal is visible. Looking for 'Try again' button...")
 
-            # Look for button with *exact* visible text "Try again" inside modal
             try_again_button = modal.locator("button", has_text="Try again")
-
             try_again_button.scroll_into_view_if_needed(timeout=2000)
             try_again_button.wait_for(state="visible", timeout=2000)
             try_again_button.click()
             print("✅ Clicked 'Try again' to dismiss modal.")
             return True
-
         except Exception as e:
             print(f"⚠️ Could not dismiss modal: {e}")
             return False
+
 
 
 
